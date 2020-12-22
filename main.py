@@ -20,3 +20,4 @@ app.add_plugins(load_plugins("plugins/"))
 
 if __name__ == "__main__":
     app.run()
+

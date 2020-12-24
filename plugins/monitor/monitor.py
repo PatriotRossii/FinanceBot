@@ -42,12 +42,6 @@ class Monitor:
             self.load_currencies()
         self.load_prices()
 
-        self.listings = {
-            "stock": stock,
-            "currencies": currencies,
-        }
-
-        self.subscribers = {}
         vk_session = vk_api.VkApi(token="99455e87cabba8273be935f69d9a9ab92f2fa9724bd7dd8ea6611d4af8afd2b99247369cf49e1da1ca7fa")
         self.vk = vk_session.get_api()
         self.get_updates()

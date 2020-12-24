@@ -6,10 +6,7 @@ import json
 import requests
 from forex_python.converter import CurrencyRates
 
-
-class ListingType(Enum):
-    STOCK = 1,
-    CURRENCY = 2,
+import sqlite3
 
 
 class Listing:
@@ -45,22 +42,21 @@ class Monitor:
             cls.__instance = Monitor(*args, *kwargs)
         return cls.__instance
 
-    def __init__(self):
+    def __init__(self, update=False):
         if Monitor.__instance:
             return
 
+        self.conn = sqlite3.connect("resources/database.db")
+        self.cursor = self.conn.cursor()
+
         self.c = CurrencyRates()
 
-        with open("currencies.json") as read_file:
-            data = json.load(read_file)
-            currencies = {
-                e["cc"]: e["name"] for e in data
-            }
+        if update:
+            self.drop_table("currencies", "symbols")
 
-        data = json.loads(requests.get("https://api.iextrading.com/1.0/ref-data/symbols").text)
-        stock = {
-            e["symbol"]: Listing(ListingType.STOCK, symbol=e["symbol"], name=e["name"]) for e in data
-        }
+            self.load_symbols()
+            self.load_currencies()
+        self.load_prices()
 
         self.listings = {
             "stock": stock,

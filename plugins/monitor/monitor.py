@@ -89,25 +89,59 @@ class Monitor:
         self.cursor.execute(select_statement, (code,))
         return self.cursor.fetchone()[0]
 
-        if len(raw_input) == 2:
-            from_cur = raw_input[0]
-            to_cur = raw_input[1]
-            if from_cur in self.listings["currencies"] and to_cur in self.listings["currencies"]:
-                return SubscribeInfo(user_id, ListingType.CURRENCY, from_cur=from_cur, to_cur=to_cur)
-        elif len(raw_input) == 1:
-            ticker = raw_input[0]
-            if ticker in self.listings["stock"]:
-                return SubscribeInfo(user_id, ListingType.STOCK, symbol=ticker)
-        return None
+    def listing_exists(self, symbol):
+        select_statement = "EXISTS(SELECT 1 FROM symbols WHERE symbol = ?)"
 
-    def add_subscriber(self, info: SubscribeInfo):
-        type_ = info.type_
+        self.cursor.execute(select_statement, (symbol,))
+        return self.cursor.fetchone()[0]
 
-        if type_ == ListingType.CURRENCY:
-            listing = Listing(ListingType.CURRENCY, from_cur=info.from_cur, to_cur=info.to_cur)
-            if listing not in self.subscribers:
-                self.subscribers[listing] = []
-            self.subscribers[listing].append(info.user_id)
+    def get_type(self, input_string):
+        input_data = input_string.split("/")
+        length = len(input_data)
+
+        if length == 2:
+            if all([self.currency_exist(e) for e in input_data]):
+                return MonitoringType.CurrencyPair
+        elif length == 1:
+            if self.listing_exists(input_data[0]):
+                return MonitoringType.Stock
+        return MonitoringType.Invalid
+
+    def get_id(self, type, symbol):
+        if type == EntityType.Currency:
+            self.cursor.execute("SELECT(currency_id) FROM currencies WHERE code = ?", (symbol,))
+        elif type == EntityType.Stock:
+            self.cursor.execute("SELECT(symbol_id) FROM symbols WHERE symbol = ?", (symbol,))
+        return self.cursor.fetchone()[0]
+
+    def add_subscriber(self, user_id, type, symbol):
+        if type == MonitoringType.CurrencyPair:
+            insert_statement = "INSERT INTO pairs_subscribers(user_id, from_id, to_id) VALUES(?, ?, ?)"
+            symbol = symbol.split("/")
+            self.cursor.execute(insert_statement, (user_id, self.get_id(symbol[0]), self.get_id(symbol[1])))
+
+        elif type == MonitoringType.Stock:
+            insert_statement = "INSERT INTO stock_subscribers(user_id, symbol_id) VALUES(?, ?)"
+            self.cursor.execute(insert_statement, (user_id, self.get_id(symbol)))
+        self.conn.commit()
+
+    def get_stock_updates(self):
+        select_stocks_stmt = "SELECT symbol_id, symbol FROM stock_subscribers INNER JOIN symbols " \
+                             "ON symbols.symbol_id = stock_subscribers.symbol_id"
+        stocks = self.cursor.execute(select_stocks_stmt).fetchall()
+
+        all_symbols = [e[1] for e in stocks]
+        new_prices = requests.get(f"https://api.iextrading.com/1.0/tops/last?symbols={','.join(all_symbols)}").json()
+
+        result = []
+        for i in range(len(new_prices)):
+            result.append(
+                (
+                    stocks[i][0],
+                    new_prices[i]["price"]
+                )
+            )
+        return result
 
         elif type_ == ListingType.STOCK:
             listing = self.listings["stock"][info.symbol]

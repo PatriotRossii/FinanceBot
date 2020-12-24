@@ -72,8 +72,42 @@ class Monitor:
         self.vk = vk_session.get_api()
         self.get_updates()
 
-    def parse(self, user_id, raw_input):
-        raw_input = raw_input.split("/")
+    def drop_table(self, *args):
+        if not args:
+            raise RuntimeError("Do you wanna drop any table?")
+        for table in args:
+            self.cursor.execute(f"DROP {table}")
+        self.conn.commit()
+
+    def load_symbols(self):
+        insert_statement = "INSERT INTO symbols(symbol, name) VALUES(?, ?)"
+
+        symbols_data = json.loads(requests.get("https://api.iextrading.com/1.0/ref-data/symbols").text)
+        for element in symbols_data:
+            self.cursor.execute(insert_statement, (element["symbol"], element["name"]))
+        self.conn.commit()
+
+    def load_prices(self):
+        update_statement = "UPDATE symbols SET last_price=?, current_price=? WHERE symbol=?"
+
+        prices_data = json.loads(requests.get("https://api.iextrading.com/1.0/tops/last").text)
+        for element in prices_data:
+            price = element["price"]
+            self.cursor.execute(update_statement, (price, price, element["symbol"]))
+        self.conn.commit()
+
+    def load_currencies(self):
+        insert_statement = "INSERT INTO currencies(code, symbol, name) VALUES(?, ?, ?)"
+        with open("currencies.json") as read_file:
+            currencies_data = json.load(read_file)
+            for currency in currencies_data:
+                self.cursor.execute(insert_statement, (currency["cc"], currency["symbol"], currency["name"]))
+
+    def currency_exists(self, code):
+        select_statement = "EXISTS(SELECT 1 FROM currencies WHERE code = ?)"
+
+        self.cursor.execute(select_statement, (code,))
+        return self.cursor.fetchone()[0]
 
         if len(raw_input) == 2:
             from_cur = raw_input[0]

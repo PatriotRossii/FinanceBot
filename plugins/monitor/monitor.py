@@ -8,30 +8,14 @@ from forex_python.converter import CurrencyRates
 
 import sqlite3
 
+class EntityType(Enum):
+    Currency = 1,
+    Stock = 2,
 
-class Listing:
-    def __init__(self, type_: ListingType, **kwargs):
-        self.type_ = type_
-        if type_ == ListingType.STOCK:
-            self.symbol = kwargs["symbol"]
-            self.name = kwargs["name"]
-        elif type_ == ListingType.CURRENCY:
-            self.from_cur = kwargs["from_cur"]
-            self.to_cur = kwargs["to_cur"]
-            self.pair = f"{self.from_cur}\\{self.to_cur}"
-
-
-class SubscribeInfo:
-    def __init__(self, user_id, type_: ListingType, **kwargs):
-        self.user_id = user_id
-        self.type_ = type_
-
-        if type_ == ListingType.STOCK:
-            self.symbol = kwargs["symbol"]
-        elif type_ == ListingType.CURRENCY:
-            self.from_cur = kwargs["from_cur"]
-            self.to_cur = kwargs["to_cur"]
-
+class MonitoringType(Enum):
+    CurrencyPair = 1,
+    Stock = 2,
+    Invalid = 3,
 
 class Monitor:
     __instance = None
